@@ -10,7 +10,8 @@ import {
   Textarea,
   useToast,
 } from "@chakra-ui/react"
-import { ButtonFile } from "app/components/ButtonFile"
+import { ButtonFile } from "app/core/components/ButtonFile"
+import { ConvertFile } from "app/core/utils/convertFile"
 import { StackProfileUpdateActions } from "app/users/components/StackProfileUpdateActions"
 import updateUserProfile from "app/users/mutations/updateUserProfile"
 import getUser from "app/users/queries/getUser"
@@ -18,7 +19,6 @@ import { useMutation, useParam, useQuery } from "blitz"
 import React, { FunctionComponent, useState } from "react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { ClientFileService } from "services/clientFileService"
 
 export const UpdateUserPageDetail: FunctionComponent = () => {
   const { t } = useTranslation()
@@ -56,11 +56,11 @@ export const UpdateUserPageDetail: FunctionComponent = () => {
     siteURL: string
   }) => {
     try {
+      const convertFileService = new ConvertFile()
+
       await updateUserProfileMutation({
-        headerImage: await ClientFileService.convertFileToBase64(
-          headerImageFile
-        ),
-        iconImage: await ClientFileService.convertFileToBase64(iconImageFile),
+        headerImage: await convertFileService.execute(headerImageFile),
+        iconImage: await convertFileService.execute(iconImageFile),
         biography: values.biography,
         name: values.name,
       })

@@ -1,5 +1,5 @@
 import { Alert, AlertIcon, Box, StackDivider, useToast } from "@chakra-ui/react"
-import { StackList } from "app/components/StackList"
+import { StackList } from "app/core/components/StackList"
 import { StackCardUser } from "app/users/components/StackCardUser"
 import followUser from "app/users/mutations/followUser"
 import unfollowUser from "app/users/mutations/unfollowUser"
@@ -8,7 +8,7 @@ import { useInfiniteQuery, useMutation, useParam } from "blitz"
 import React, { FunctionComponent } from "react"
 import { useTranslation } from "react-i18next"
 
-type Props = { userId?: string }
+type Props = { userId: string | null }
 
 export const ShowUserPageListFollowees: FunctionComponent<Props> = ({
   userId,
@@ -17,35 +17,30 @@ export const ShowUserPageListFollowees: FunctionComponent<Props> = ({
 
   const username = useParam("username", "string")
 
-  const [groupedFriendships, { setQueryData }] = useInfiniteQuery(
+  const [groupedFollowees, { setQueryData }] = useInfiniteQuery(
     getUserFolloweesInfinite,
     (page = { take: 80, skip: 0, username }) => page,
     {
       getFetchMore: (lastGroup) => lastGroup.nextPage,
-      refetchInterval: 16000,
+      refetchInterval: 1000 * 2 ** 5,
     }
   )
 
-  const [followUserMutation, { isLoading: isLoadingFollowUser }] = useMutation(
-    followUser
-  )
+  const [followUserMutation] = useMutation(followUser)
 
-  const [
-    unfollowUserMutation,
-    { isLoading: isLoadingUnfollowUser },
-  ] = useMutation(unfollowUser)
+  const [unfollowUserMutation] = useMutation(unfollowUser)
 
   const toast = useToast()
 
   const onFollow = async (userId: string) => {
     try {
-      const updated = await followUserMutation({ userId })
-      for (const groupedFriendship of groupedFriendships) {
-        for (const friendship of groupedFriendship.friendships) {
-          if (friendship.followeeId !== userId) {
+      await followUserMutation({ userId })
+      for (const groupedFriendship of groupedFollowees) {
+        for (const followee of groupedFriendship.friendships) {
+          if (followee.id !== userId) {
             continue
           }
-          friendship.followee.followers = updated.followers
+          followee.isFollower = true
           await setQueryData(groupedFriendship)
         }
       }
@@ -57,13 +52,13 @@ export const ShowUserPageListFollowees: FunctionComponent<Props> = ({
 
   const onUnfollow = async (userId: string) => {
     try {
-      const updated = await unfollowUserMutation({ userId })
-      for (const groupedFriendship of groupedFriendships) {
+      await unfollowUserMutation({ userId })
+      for (const groupedFriendship of groupedFollowees) {
         for (const friendship of groupedFriendship.friendships) {
-          if (friendship.followeeId !== userId) {
+          if (friendship.id !== userId) {
             continue
           }
-          friendship.followee.followers = updated.followers
+          friendship.isFollower = false
           await setQueryData(groupedFriendship)
         }
       }
@@ -73,7 +68,7 @@ export const ShowUserPageListFollowees: FunctionComponent<Props> = ({
     }
   }
 
-  const [group] = groupedFriendships
+  const [group] = groupedFollowees
 
   const isEmpty = group.friendships.length === 0
 
@@ -87,15 +82,15 @@ export const ShowUserPageListFollowees: FunctionComponent<Props> = ({
           </Alert>
         </Box>
       )}
-      {groupedFriendships.map((group) => {
-        return group.friendships.map((friendship) => {
+      {groupedFollowees.map((group) => {
+        return group.friendships.map((followee) => {
           return (
             <StackCardUser
-              {...friendship}
-              hasAction={!!userId && userId !== friendship.followeeId}
-              onFollow={() => onFollow(friendship.followee.id)}
-              onUnfollow={() => onUnfollow(friendship.followee.id)}
-              user={friendship.followee}
+              {...followee}
+              hasAction={!!userId && userId !== followee.id}
+              onFollow={() => onFollow(followee.id)}
+              onUnfollow={() => onUnfollow(followee.id)}
+              follower={followee}
             />
           )
         })

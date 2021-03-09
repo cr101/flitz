@@ -1,41 +1,31 @@
-import { Ctx } from "blitz"
-import { ImageFactory } from "domain/factories"
-import { Id, PostText, postTextSchema } from "domain/valueObjects"
-import { FriendshipRepository, PostRepository } from "infrastructure"
-import { FileService } from "services"
-import * as z from "zod"
+import { zCreatePostMutation } from "app/posts/validations/createPostMutation"
+import { resolver } from "blitz"
+import { CreateFileService, CreatePostService } from "integrations/application"
+import { Id, ImageFactory, PostText } from "integrations/domain"
+import { createAppContext } from "integrations/registry"
 
-export const inputSchema = z.object({
-  text: postTextSchema,
-  image: z.string().nullable(), // base64 workaround. see onCreatePost in HomePageInput
-})
+export default resolver.pipe(
+  resolver.zod(zCreatePostMutation),
+  resolver.authorize(),
+  (input, ctx) => ({
+    image: ImageFactory.fromDataURL(input.image),
+    text: new PostText(input.text),
+    userId: new Id(ctx.session.userId),
+  }),
+  async (input) => {
+    const app = await createAppContext()
 
-const createPost = async (input: z.infer<typeof inputSchema>, ctx: Ctx) => {
-  ctx.session.authorize()
+    const fileEntity = await app.get(CreateFileService).call({
+      userId: input.userId,
+      image: input.image,
+    })
 
-  const { text, image } = inputSchema
-    .transform((input) => ({
-      text: new PostText(input.text),
-      image: ImageFactory.fromDataURL(input.image),
-    }))
-    .parse(input)
+    await app.get(CreatePostService).call({
+      fileIds: fileEntity ? [fileEntity.id] : [],
+      text: input.text,
+      userId: input.userId,
+    })
 
-  const userId = new Id(ctx.session.userId)
-
-  const friendships = await FriendshipRepository.getUserFollowers({
-    followeeId: userId,
-  })
-
-  const file = image ? await FileService.uploadFile({ userId, image }) : null
-
-  const post = await PostRepository.createPost({
-    friendships,
-    text,
-    userId,
-    fileIds: file ? [new Id(file.id)] : [],
-  })
-
-  return post
-}
-
-export default createPost
+    return null
+  }
+)

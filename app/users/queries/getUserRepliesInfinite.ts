@@ -1,51 +1,48 @@
-import { Ctx } from "blitz"
-import { PageService } from "domain/services"
+import { resolver } from "blitz"
 import {
   Id,
+  PageService,
   Skip,
-  skipSchema,
   Take,
   Username,
-  usernameSchema,
-} from "domain/valueObjects"
-import { PostRepository } from "infrastructure"
+  zSkip,
+  zUsername,
+} from "integrations/domain"
+import { UserReplyQuery } from "integrations/infrastructure"
+import { createAppContext } from "integrations/registry"
 import * as z from "zod"
 
-const inputSchema = z.object({
-  skip: skipSchema,
-  username: usernameSchema,
+const GetUserRepliesInfinite = z.object({
+  skip: zSkip,
+  username: zUsername,
 })
 
-const getUserRepliesInfinite = async (
-  input: z.infer<typeof inputSchema>,
-  ctx: Ctx
-) => {
-  inputSchema.parse(input)
+export default resolver.pipe(
+  resolver.zod(GetUserRepliesInfinite),
+  (input, ctx) => ({
+    skip: new Skip(input.skip),
+    take: new Take(),
+    userId: Id.nullable(ctx.session.userId),
+    username: new Username(input.username),
+  }),
+  async ({ skip, take, userId, username }) => {
+    const app = await createAppContext()
 
-  const userId = Id.nullable(ctx.session.userId)
+    const posts = await app.get(UserReplyQuery).findMany({
+      skip,
+      take,
+      userId,
+      username,
+    })
 
-  const skip = new Skip(input.skip)
+    const count = await app.get(UserReplyQuery).count(username)
 
-  const take = new Take()
+    const hasMore = app.get(PageService).hasMore(skip, take, count)
 
-  const username = new Username(input.username)
+    const nextPage = hasMore ? app.get(PageService).nextPage(take, skip) : null
 
-  const posts = await PostRepository.getRepliesByUsername({
-    skip,
-    take,
-    userId,
-    username,
-  })
+    const isEmpty = posts.length === 0
 
-  const count = await PostRepository.countUserReplies({ username })
-
-  const hasMore = PageService.hasMore({ count, skip, take })
-
-  const nextPage = hasMore ? PageService.nextPage({ take, skip }) : null
-
-  const isEmpty = posts.length === 0
-
-  return { count, posts, nextPage, hasMore, isEmpty }
-}
-
-export default getUserRepliesInfinite
+    return { count, posts, nextPage, hasMore, isEmpty }
+  }
+)

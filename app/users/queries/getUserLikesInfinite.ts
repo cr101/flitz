@@ -1,51 +1,45 @@
-import { Ctx } from "blitz"
-import { PageService } from "domain/services"
+import { resolver } from "blitz"
 import {
   Id,
+  PageService,
   Skip,
-  skipSchema,
   Take,
   Username,
-  usernameSchema,
-} from "domain/valueObjects"
-import { LikeRepository } from "infrastructure/likeRepository"
+  zSkip,
+  zUsername,
+} from "integrations/domain"
+import { UserLikeQuery } from "integrations/infrastructure"
+import { createAppContext } from "integrations/registry"
 import * as z from "zod"
 
-const inputSchema = z.object({
-  skip: skipSchema,
-  username: usernameSchema,
+const GetUserLikesInfinite = z.object({
+  skip: zSkip,
+  username: zUsername,
 })
 
-const getUserLikesInfinite = async (
-  input: z.infer<typeof inputSchema>,
-  ctx: Ctx
-) => {
-  inputSchema.parse(input)
+export default resolver.pipe(
+  resolver.zod(GetUserLikesInfinite),
+  (input, ctx) => ({
+    skip: new Skip(input.skip),
+    take: new Take(),
+    userId: Id.nullable(ctx.session.userId),
+    username: new Username(input.username),
+  }),
+  async ({ skip, take, userId, username }) => {
+    const app = await createAppContext()
 
-  const userId = Id.nullable(ctx.session.userId)
+    const likes = await app
+      .get(UserLikeQuery)
+      .findMany({ skip, take, userId, username })
 
-  const username = new Username(input.username)
+    const count = await app.get(UserLikeQuery).count(username)
 
-  const skip = new Skip(input.skip)
+    const hasMore = app.get(PageService).hasMore(skip, take, count)
 
-  const take = new Take()
+    const nextPage = hasMore ? app.get(PageService).nextPage(take, skip) : null
 
-  const likes = await LikeRepository.getLikes({
-    skip,
-    take,
-    userId,
-    username,
-  })
+    const isEmpty = likes.length === 0
 
-  const count = await LikeRepository.countLikes({ username })
-
-  const hasMore = PageService.hasMore({ count, skip, take })
-
-  const nextPage = hasMore ? PageService.nextPage({ take, skip }) : null
-
-  const isEmpty = likes.length === 0
-
-  return { count, likes, nextPage, hasMore, isEmpty }
-}
-
-export default getUserLikesInfinite
+    return { count, likes, nextPage, hasMore, isEmpty }
+  }
+)

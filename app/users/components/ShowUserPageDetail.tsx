@@ -17,7 +17,7 @@ export const ShowUserPageDetail: FunctionComponent = () => {
   const [user, { setQueryData }] = useQuery(
     getUser,
     { username: username + "" },
-    { refetchInterval: 8000 }
+    { refetchInterval: 1000 * 2 ** 5 }
   )
 
   const [followUserMutation, { isLoading: isLoadingFollowUser }] = useMutation(
@@ -62,7 +62,7 @@ export const ShowUserPageDetail: FunctionComponent = () => {
       <ErrorBoundary FallbackComponent={() => null}>
         <Suspense fallback={null}>
           <StackUserAction
-            hasRelationship={user.followers && user.followers.length !== 0}
+            hasRelationship={user.isFollowee}
             isLoading={isLoadingFollowUser || isLoadingUnfollowUser}
             onExchange={onExchange}
             onFollow={onFollow}

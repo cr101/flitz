@@ -9,9 +9,9 @@ import {
   StackDivider,
   Text,
 } from "@chakra-ui/react"
-import { StackHeader } from "app/components/StackHeader"
-import { StackMain } from "app/components/StackMain"
-import Layout from "app/layouts/Layout"
+import { StackHeader } from "app/core/components/StackHeader"
+import { StackMain } from "app/core/components/StackMain"
+import Layout from "app/core/layouts/Layout"
 import { BlitzPage, Link } from "blitz"
 import React from "react"
 import { useTranslation } from "react-i18next"
@@ -39,7 +39,7 @@ const AboutPage: BlitzPage = () => {
         </Box>
         <Stack spacing={4}>
           <Stack>
-            <Heading size={"lg"}>{t("The Fullstack Miniblog System")}</Heading>
+            <Heading size={"lg"}>{t("The Feed App Boilerplate")}</Heading>
             <Heading size={"md"}>
               {t("built on ")}
               <LinkText href={"https://blitzjs.com/"} isExternal>

@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next"
 export const SettingsPageDetail: FunctionComponent = () => {
   const { t } = useTranslation()
 
-  const [setting, { setQueryData }] = useQuery(getSetting, {
+  const [setting, { setQueryData }] = useQuery(getSetting, null, {
     refetchInterval: false,
   })
 
@@ -28,8 +28,9 @@ export const SettingsPageDetail: FunctionComponent = () => {
   const toast = useToast()
 
   const onSendTestNotification = async () => {
-    const result = await testNotificationMutation()
-    if (result.failureCount > 0) {
+    try {
+      await testNotificationMutation()
+    } catch (error) {
       toast({
         status: "error",
         title: t`Failed to send a test notificaiton.`,

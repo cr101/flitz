@@ -1,5 +1,5 @@
 import { Alert, AlertIcon, Box, StackDivider } from "@chakra-ui/react"
-import { StackList } from "app/components/StackList"
+import { StackList } from "app/core/components/StackList"
 import { StackCardPost } from "app/posts/components/StackCardPost"
 import getUserLikesInfinite from "app/users/queries/getUserLikesInfinite"
 import { useInfiniteQuery, useParam } from "blitz"
@@ -16,7 +16,7 @@ export const ShowUserPageListLikes: FunctionComponent = () => {
     (page = { skip: 0, username }) => page,
     {
       getFetchMore: (lastGroup) => lastGroup.nextPage,
-      refetchInterval: 16000,
+      refetchInterval: 1000 * 2 ** 5,
     }
   )
 
@@ -25,7 +25,7 @@ export const ShowUserPageListLikes: FunctionComponent = () => {
       {groupedLikes.map((group) => {
         if (group.isEmpty) {
           return (
-            <Box key={"alert"} px={4}>
+            <Box key={"empty"} px={4}>
               <Alert status={"info"}>
                 <AlertIcon />
                 {t("This user hasn't liked any post yet.")}
@@ -34,8 +34,8 @@ export const ShowUserPageListLikes: FunctionComponent = () => {
           )
         }
 
-        return group.likes.map((like) => {
-          return <StackCardPost key={like.id} {...like.post} />
+        return group.likes.map((post) => {
+          return <StackCardPost key={post.id} {...post} isDisabled={false} />
         })
       })}
     </StackList>

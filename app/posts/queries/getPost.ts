@@ -1,22 +1,26 @@
-import { NotFoundError } from "blitz"
-import { Id, idSchema } from "domain/valueObjects"
-import { PostRepository } from "infrastructure"
+import { NotFoundError, resolver } from "blitz"
+import { Id, zId } from "integrations/domain"
+import { PostQuery } from "integrations/infrastructure/queries/post.query"
+import { createAppContext } from "integrations/registry"
 import * as z from "zod"
 
-const inputSchema = z.object({ id: idSchema })
+const GetPost = z.object({ id: zId })
 
-const getPost = async (input: z.infer<typeof inputSchema>) => {
-  inputSchema.parse(input)
+export default resolver.pipe(
+  resolver.zod(GetPost),
+  (input, ctx) => ({
+    id: new Id(input.id),
+    userId: ctx.session.userId === null ? null : new Id(ctx.session.userId),
+  }),
+  async (input) => {
+    const app = await createAppContext()
 
-  const id = new Id(input.id)
+    const post = await app.get(PostQuery).find(input.id, input.userId)
 
-  const post = await PostRepository.getPost({ id })
+    if (!post) {
+      throw new NotFoundError()
+    }
 
-  if (!post) {
-    throw new NotFoundError()
+    return post
   }
-
-  return post
-}
-
-export default getPost
+)

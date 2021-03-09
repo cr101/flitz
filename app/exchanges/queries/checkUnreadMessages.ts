@@ -1,15 +1,20 @@
-import { Ctx } from "blitz"
-import { Id } from "domain/valueObjects"
-import { ExchangeRepository } from "infrastructure/exchangeRepository"
+import { resolver } from "blitz"
+import { Id } from "integrations/domain"
+import { UserExchangeQuery } from "integrations/infrastructure"
+import { createAppContext } from "integrations/registry"
 
-const checkUnreadMessages = async (_ = null, ctx: Ctx) => {
-  ctx.session.authorize()
+export default resolver.pipe(
+  resolver.authorize(),
+  (_: unknown, ctx) => ({
+    userId: new Id(ctx.session.userId),
+  }),
+  async ({ userId }) => {
+    const app = await createAppContext()
 
-  const userId = new Id(ctx.session.userId)
+    const existence = await app
+      .get(UserExchangeQuery)
+      .checkExistence({ userId })
 
-  const messages = await ExchangeRepository.getUserExchange({ userId })
-
-  return messages !== null
-}
-
-export default checkUnreadMessages
+    return existence
+  }
+)

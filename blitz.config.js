@@ -1,14 +1,10 @@
-const {
-  sessionMiddleware,
-  simpleRolesIsAuthorized,
-} = require("@blitzjs/server")
-const withPWA = require("next-pwa")
+const { sessionMiddleware, simpleRolesIsAuthorized } = require("blitz")
 
-module.exports = withPWA({
+module.exports = {
   log: { level: "error" },
-  middleware: [sessionMiddleware({ isAuthorized: simpleRolesIsAuthorized })],
-  pwa: {
-    dest: "public",
-    disable: process.env.NODE_ENV === "development",
-  },
-})
+  middleware: [
+    sessionMiddleware({
+      isAuthorized: simpleRolesIsAuthorized,
+    }),
+  ],
+}

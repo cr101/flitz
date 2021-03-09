@@ -1,59 +1,31 @@
-import { AuthenticationError, Ctx, NotFoundError } from "blitz"
-import { PasswordService } from "domain/services"
-import {
-  HashedPassword,
-  Id,
-  Password,
-  passwordSchema,
-} from "domain/valueObjects"
-import { AccountRepository, SessionRepository } from "infrastructure"
+import { resolver } from "blitz"
+import { UpdateAccountPasswordService } from "integrations/application"
+import { Id, Password, zPassword } from "integrations/domain"
+import { createAppContext } from "integrations/registry"
 import * as z from "zod"
 
-const inputSchema = z.object({
-  currentPassword: passwordSchema,
-  password: passwordSchema,
+const zUpdateAccountPassword = z.object({
+  currentPassword: zPassword,
+  password: zPassword,
 })
 
-const updateAccountPassword = async (
-  input: z.infer<typeof inputSchema>,
-  ctx: Ctx
-) => {
-  ctx.session.authorize()
+export default resolver.pipe(
+  resolver.zod(zUpdateAccountPassword),
+  resolver.authorize(),
+  (input, ctx) => ({
+    currentPassword: new Password(input.currentPassword),
+    password: new Password(input.password),
+    userId: new Id(ctx.session.userId),
+  }),
+  async (input) => {
+    const app = await createAppContext()
 
-  const { currentPassword, password } = inputSchema
-    .transform((input) => ({
-      currentPassword: new Password(input.password),
-      password: new Password(input.password),
-    }))
-    .parse(input)
+    await app.get(UpdateAccountPasswordService).call({
+      currentPassword: input.currentPassword,
+      password: input.password,
+      userId: input.userId,
+    })
 
-  const userId = SessionRepository.getUserId(ctx.session)
-
-  const account = await AccountRepository.findByUserId(userId)
-
-  if (!account || account.hashedPassword === null) {
-    throw new NotFoundError()
+    return null
   }
-
-  // 現在のパスワードを確認する
-  const result = await PasswordService.verifyPassword(
-    new HashedPassword(account.hashedPassword),
-    currentPassword
-  )
-
-  if (PasswordService.isInvalid(result)) {
-    throw new AuthenticationError()
-  }
-
-  const hashedPassword = await PasswordService.hashPassword(password)
-
-  // 新しいパスワードを保存する
-  await AccountRepository.updateHashedPassword({
-    id: new Id(account.id),
-    hashedPassword,
-  })
-
-  return null
-}
-
-export default updateAccountPassword
+)

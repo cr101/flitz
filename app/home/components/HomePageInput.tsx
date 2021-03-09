@@ -7,16 +7,16 @@ import {
   Stack,
   useToast,
 } from "@chakra-ui/react"
-import { AvatarUser } from "app/components/AvatarUser"
-import { ButtonFile } from "app/components/ButtonFile"
-import { RenderFileLoader } from "app/components/RenderFileLoader"
-import { TextareaAutosize } from "app/components/TextareaAutosize"
+import { AvatarUser } from "app/core/components/AvatarUser"
+import { ButtonFile } from "app/core/components/ButtonFile"
+import { RenderFileLoader } from "app/core/components/RenderFileLoader"
+import { TextareaAutosize } from "app/core/components/TextareaAutosize"
+import { ConvertFile } from "app/core/utils/convertFile"
 import createPost from "app/posts/mutations/createPost"
 import { useMutation, useSession } from "blitz"
 import React, { FunctionComponent, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { FiSend } from "react-icons/fi"
-import { ClientFileService } from "services/clientFileService"
 
 export const HomePageInput: FunctionComponent = () => {
   const session = useSession()
@@ -32,8 +32,10 @@ export const HomePageInput: FunctionComponent = () => {
   const toast = useToast()
 
   const onCreatePost = async () => {
+    const convertFileService = new ConvertFile()
+
     try {
-      const encodedImage = await ClientFileService.convertFileToBase64(file)
+      const encodedImage = await convertFileService.execute(file)
       await createPostMutation({ text, image: encodedImage })
       setText("")
       setFile(null)

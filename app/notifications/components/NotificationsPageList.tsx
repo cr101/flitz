@@ -1,5 +1,5 @@
 import { Alert, AlertIcon, Box, StackDivider } from "@chakra-ui/react"
-import { StackList } from "app/components/StackList"
+import { StackList } from "app/core/components/StackList"
 import { StackCardNotification } from "app/notifications/components/StackCardNotification"
 import getNotificationsInfinite from "app/notifications/queries/getNotificationsInfinite"
 import { useInfiniteQuery } from "blitz"
@@ -14,7 +14,7 @@ export const NotificationsPageList: FunctionComponent = () => {
     (page = { skip: 0 }) => page,
     {
       getFetchMore: (lastGroup) => lastGroup.nextPage,
-      refetchInterval: 8000,
+      refetchInterval: 1000 * 2 ** 4,
     }
   )
 
@@ -34,7 +34,7 @@ export const NotificationsPageList: FunctionComponent = () => {
       )}
       {groupedNotifications.map((group) => {
         return group.notifications.map((notification) => {
-          return (
+          return notification === null ? null : (
             <StackCardNotification key={notification.id} {...notification} />
           )
         })

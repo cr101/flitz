@@ -1,28 +1,33 @@
-import { Ctx } from "blitz"
-import { Id, idSchema } from "domain/valueObjects"
-import { UserRepository } from "infrastructure"
+import { NotFoundError, resolver } from "blitz"
+import { UnfollowUserService } from "integrations/application"
+import { Id, zId } from "integrations/domain"
+import { UserQuery } from "integrations/infrastructure"
+import { createAppContext } from "integrations/registry"
 import * as z from "zod"
 
-const inputSchema = z.object({ userId: idSchema })
+const UnfollowUser = z.object({ userId: zId })
 
-const unfollowUser = async (input: z.infer<typeof inputSchema>, ctx: Ctx) => {
-  ctx.session.authorize()
+export default resolver.pipe(
+  resolver.zod(UnfollowUser),
+  resolver.authorize(),
+  (input, ctx) => ({
+    followeeId: new Id(input.userId),
+    followerId: new Id(ctx.session.userId),
+  }),
+  async (input) => {
+    const app = await createAppContext()
 
-  const { userId: followeeId } = inputSchema
-    .transform((input) => ({
-      userId: new Id(input.userId),
-    }))
-    .parse(input)
+    await app.get(UnfollowUserService).call({
+      followeeId: input.followeeId,
+      followerId: input.followerId,
+    })
 
-  const followerId = new Id(ctx.session.userId)
+    const queryProfile = await app.get(UserQuery).find(input.followerId)
 
-  if (followerId.value === followeeId.value) {
-    throw new Error("Unexpected error")
+    if (queryProfile === null) {
+      throw new NotFoundError()
+    }
+
+    return queryProfile
   }
-
-  const user = await UserRepository.unfollowUser({ followeeId, followerId })
-
-  return user
-}
-
-export default unfollowUser
+)

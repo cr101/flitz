@@ -1,66 +1,56 @@
-import { Ctx } from "blitz"
-import { ImageFactory } from "domain/factories"
+import { resolver } from "blitz"
+import {
+  CreateFileService,
+  UpdateUserProfileService,
+} from "integrations/application"
 import {
   Biography,
-  biographySchema,
   Id,
+  ImageFactory,
   Name,
-  nameSchema,
-  Username,
-} from "domain/valueObjects"
-import { SessionRepository, UserRepository } from "infrastructure"
-import { FileService } from "services"
+  zBiography,
+  zName,
+} from "integrations/domain"
+import { createAppContext } from "integrations/registry"
 import * as z from "zod"
 
-const inputSchema = z.object({
-  biography: biographySchema,
+const UpdateUserProfile = z.object({
+  biography: zBiography,
   headerImage: z.string().nullable(),
   iconImage: z.string().nullable(),
-  name: nameSchema,
+  name: zName,
 })
 
-const updateUserProfile = async (
-  input: z.infer<typeof inputSchema>,
-  ctx: Ctx
-) => {
-  ctx.session.authorize()
+export default resolver.pipe(
+  resolver.zod(UpdateUserProfile),
+  resolver.authorize(),
+  (input, ctx) => ({
+    biography: new Biography(input.biography),
+    headerImage: ImageFactory.fromDataURL(input.headerImage),
+    iconImage: ImageFactory.fromDataURL(input.iconImage),
+    name: new Name(input.name),
+    userId: new Id(ctx.session.userId),
+  }),
+  async (input, ctx) => {
+    const app = await createAppContext()
 
-  const { biography, headerImage, iconImage, name } = inputSchema
-    .transform((input) => ({
-      biography: new Biography(input.biography),
-      headerImage: ImageFactory.fromDataURL(input.headerImage),
-      iconImage: ImageFactory.fromDataURL(input.iconImage),
-      name: new Name(input.name),
-    }))
-    .parse(input)
+    const headerImageFileEntry = await app
+      .get(CreateFileService)
+      .call({ userId: input.userId, image: input.headerImage })
 
-  const userId = new Id(ctx.session.userId)
+    const iconImageFileEntity = await app
+      .get(CreateFileService)
+      .call({ userId: input.userId, image: input.iconImage })
 
-  const headerImageFile = await FileService.uploadFile({
-    userId,
-    image: headerImage,
-  })
+    await app.get(UpdateUserProfileService).call({
+      headerImageId: headerImageFileEntry?.id,
+      iconImageId: iconImageFileEntity?.id,
+      biography: input.biography,
+      name: input.name,
+      userId: input.userId,
+      session: ctx.session,
+    })
 
-  const iconImageFile = await FileService.uploadFile({
-    userId,
-    image: iconImage,
-  })
-
-  const user = await UserRepository.updateUser({
-    biography,
-    headerImageId: headerImageFile ? new Id(headerImageFile.id) : null,
-    iconImageId: iconImageFile ? new Id(iconImageFile.id) : null,
-    id: userId,
-    name,
-  })
-
-  await SessionRepository.updatePublicData(ctx.session, {
-    name: Name.nullable(user.name),
-    username: new Username(user.username),
-    iconImageId: user.iconImage ? new Id(user.iconImage.id) : null,
-  })
-
-  return user
-}
-
-export default updateUserProfile
+    return null
+  }
+)

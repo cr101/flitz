@@ -1,49 +1,46 @@
-import { Ctx } from "blitz"
-import { PageService } from "domain/services"
+import { resolver } from "blitz"
 import {
   Id,
+  PageService,
   Skip,
-  skipSchema,
   Take,
   Username,
-  usernameSchema,
-} from "domain/valueObjects"
-import { FriendshipRepository } from "infrastructure"
+  zSkip,
+  zUsername,
+} from "integrations/domain"
+import { UserFolloweerQuery } from "integrations/infrastructure"
+import { createAppContext } from "integrations/registry"
 import * as z from "zod"
 
-const inputSchema = z.object({
-  skip: skipSchema,
-  username: usernameSchema,
+const GetUserFollowersInfinite = z.object({
+  skip: zSkip,
+  username: zUsername,
 })
 
-const getUserFollowersInfinite = async (
-  input: z.infer<typeof inputSchema>,
-  ctx: Ctx
-) => {
-  inputSchema.parse(input)
+export default resolver.pipe(
+  resolver.zod(GetUserFollowersInfinite),
+  (input, ctx) => ({
+    skip: new Skip(input.skip),
+    take: new Take(),
+    userId: Id.nullable(ctx.session.userId),
+    username: new Username(input.username),
+  }),
+  async ({ skip, take, userId, username }) => {
+    const app = await createAppContext()
 
-  const userId = Id.nullable(ctx.session.userId)
+    const friendships = await app.get(UserFolloweerQuery).findByUsername({
+      skip,
+      take,
+      userId,
+      username,
+    })
 
-  const skip = new Skip(input.skip)
+    const count = await app.get(UserFolloweerQuery).count({ username })
 
-  const take = new Take()
+    const hasMore = app.get(PageService).hasMore(skip, take, count)
 
-  const username = new Username(input.username)
+    const nextPage = hasMore ? app.get(PageService).nextPage(take, skip) : null
 
-  const friendships = await FriendshipRepository.getUserFollowersByUsername({
-    skip,
-    take,
-    userId,
-    username,
-  })
-
-  const count = await FriendshipRepository.countUserFollowers({ username })
-
-  const hasMore = PageService.hasMore({ count, skip, take })
-
-  const nextPage = hasMore ? PageService.nextPage({ take, skip }) : null
-
-  return { count, hasMore, friendships, nextPage }
-}
-
-export default getUserFollowersInfinite
+    return { count, hasMore, friendships, nextPage }
+  }
+)

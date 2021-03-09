@@ -1,10 +1,6 @@
-import { Id } from "domain/valueObjects"
-import {
-  EnvRepository,
-  FileRepository,
-  StorageRepository,
-} from "infrastructure"
-import { ImageRepository } from "infrastructure/imageRepository"
+import { ReadImageBufferService } from "integrations/application/readImageBuffer.service"
+import { Id } from "integrations/domain"
+import { createAppContext } from "integrations/registry/createAppContext"
 import { NextApiRequest, NextApiResponse } from "next"
 
 const icon = async (req: NextApiRequest, resp: NextApiResponse) => {
@@ -12,27 +8,15 @@ const icon = async (req: NextApiRequest, resp: NextApiResponse) => {
     return resp.status(500).end()
   }
 
-  const file = await FileRepository.getFile({ id: new Id(req.query.id) })
+  const app = await createAppContext()
 
-  if (file === null) {
-    return resp.status(400).end()
+  const buffer = await app
+    .get(ReadImageBufferService)
+    .call({ fileId: new Id(req.query.id) })
+
+  if (buffer instanceof Error) {
+    return resp.status(500).end()
   }
-
-  const filePath = new Id(file.path)
-
-  if (EnvRepository.isLocalProject()) {
-    const hasImage = ImageRepository.hasImage(filePath)
-
-    if (!hasImage) {
-      return resp.status(400).end()
-    }
-  }
-
-  if (EnvRepository.isFirebaseProject()) {
-    await StorageRepository.downloadFileFromCloudStorage(filePath)
-  }
-
-  const buffer = await ImageRepository.readImage(filePath)
 
   resp.setHeader("Content-Type", "image/png")
 

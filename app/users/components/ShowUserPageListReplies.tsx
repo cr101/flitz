@@ -1,5 +1,5 @@
 import { Alert, AlertIcon, Box, StackDivider } from "@chakra-ui/react"
-import { StackList } from "app/components/StackList"
+import { StackList } from "app/core/components/StackList"
 import { StackCardPost } from "app/posts/components/StackCardPost"
 import getUserRepliesInfinite from "app/users/queries/getUserRepliesInfinite"
 import { useInfiniteQuery, useParam } from "blitz"
@@ -16,7 +16,7 @@ export const ShowUserPageListReplies: FunctionComponent = () => {
     (page = { skip: 0, username }) => page,
     {
       getFetchMore: (lastGroup) => lastGroup.nextPage,
-      refetchInterval: 16000,
+      refetchInterval: 1000 * 2 ** 5,
     }
   )
 
@@ -25,7 +25,7 @@ export const ShowUserPageListReplies: FunctionComponent = () => {
       {groupedPosts.map((group) => {
         if (group.isEmpty) {
           return (
-            <Box px={4}>
+            <Box key={"empty"} px={4}>
               <Alert key={"alert"} status={"info"}>
                 <AlertIcon />
                 {t("This user hasn't posted yet.")}
@@ -33,8 +33,9 @@ export const ShowUserPageListReplies: FunctionComponent = () => {
             </Box>
           )
         }
+        console.log(group.posts)
         return group.posts.map((post) => {
-          return <StackCardPost key={post.id} {...post} />
+          return <StackCardPost key={post.id} {...post} isDisabled={false} />
         })
       })}
     </StackList>

@@ -1,53 +1,28 @@
-import { Ctx } from "blitz"
-import { HashedPasswordFactory, NameFactory } from "domain/factories"
-import {
-  Biography,
-  Email,
-  Id,
-  Name,
-  Password,
-  Username,
-  UserRole,
-} from "domain/valueObjects"
-import { SessionRepository, UserRepository } from "infrastructure"
-import * as z from "zod"
+import { zCreateUserMutation } from "app/home/validations/createUserMutation"
+import { resolver } from "blitz"
+import { SignUpService } from "integrations/application"
+import { Email, Password } from "integrations/domain"
+import { createAppContext } from "integrations/registry"
 
-export const inputSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(5).max(100),
-})
+export default resolver.pipe(
+  resolver.zod(zCreateUserMutation),
+  (input) => ({
+    email: new Email(input.email),
+    password: new Password(input.password),
+  }),
+  async (input, ctx) => {
+    const app = await createAppContext()
 
-const createUser = async (input: z.infer<typeof inputSchema>, ctx: Ctx) => {
-  const { email, password } = inputSchema
-    .transform((input) => ({
-      email: new Email(input.email),
-      password: new Password(input.password),
-    }))
-    .parse(input)
+    const signUp = await app.get(SignUpService).call({
+      session: ctx.session,
+      password: input.password,
+      email: input.email,
+    })
 
-  const hashedPassword = await HashedPasswordFactory.fromPassword(password)
+    if (signUp instanceof Error) {
+      throw signUp
+    }
 
-  const role = new UserRole("USER")
-
-  const name = NameFactory.fromEmail(email)
-
-  const user = await UserRepository.createUser({
-    biography: new Biography(""),
-    email,
-    hashedPassword,
-    name,
-    role,
-  })
-
-  await SessionRepository.createSession(ctx.session, {
-    name: Name.nullable(user.name),
-    role,
-    userId: new Id(user.id),
-    username: new Username(user.username),
-    iconImageId: null,
-  })
-
-  return user
-}
-
-export default createUser
+    return null
+  }
+)

@@ -1,24 +1,26 @@
-import { Ctx, NotFoundError } from "blitz"
-import { Id, Username, usernameSchema } from "domain/valueObjects"
-import { UserRepository } from "infrastructure"
+import { NotFoundError, resolver } from "blitz"
+import { Id, Username, zUsername } from "integrations/domain"
+import { UserQuery } from "integrations/infrastructure"
+import { createAppContext } from "integrations/registry"
 import * as z from "zod"
 
-const inputSchema = z.object({ username: usernameSchema })
+const GetUser = z.object({ username: zUsername })
 
-const getUser = async (input: z.infer<typeof inputSchema>, ctx: Ctx) => {
-  inputSchema.parse(input)
+export default resolver.pipe(
+  resolver.zod(GetUser),
+  (input, ctx) => ({
+    userId: Id.nullable(ctx.session.userId),
+    username: new Username(input.username),
+  }),
+  async ({ userId, username }) => {
+    const app = await createAppContext()
 
-  const userId = Id.nullable(ctx.session.userId)
+    const user = await app.get(UserQuery).findByUsername(username, userId)
 
-  const username = new Username(input.username)
+    if (!user) {
+      throw new NotFoundError()
+    }
 
-  const user = await UserRepository.getUserByUsername({ userId, username })
-
-  if (!user) {
-    throw new NotFoundError()
+    return user
   }
-
-  return user
-}
-
-export default getUser
+)

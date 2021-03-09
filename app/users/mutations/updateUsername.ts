@@ -1,28 +1,27 @@
-import { Ctx } from "blitz"
-import { Id, Name, nameSchema, Username } from "domain/valueObjects"
-import { SessionRepository, UserRepository } from "infrastructure"
+import { resolver } from "blitz"
+import { UpdateUsernameService } from "integrations/application"
+import { Id, Name, zName } from "integrations/domain"
+import { createAppContext } from "integrations/registry"
 import * as z from "zod"
 
-const inputSchema = z.object({ username: nameSchema })
+const UpdateUsername = z.object({ username: zName })
 
-const updateUsername = async (input: z.infer<typeof inputSchema>, ctx: Ctx) => {
-  ctx.session.authorize()
+export default resolver.pipe(
+  resolver.zod(UpdateUsername),
+  resolver.authorize(),
+  (input, ctx) => ({
+    userId: new Id(ctx.session.userId),
+    username: new Name(input.username),
+  }),
+  async (input, ctx) => {
+    const app = await createAppContext()
 
-  const { username } = inputSchema
-    .transform((input) => ({ username: new Name(input.username) }))
-    .parse(input)
+    await app.get(UpdateUsernameService).call({
+      session: ctx.session,
+      username: input.username,
+      userId: input.userId,
+    })
 
-  const userId = SessionRepository.getUserId(ctx.session)
-
-  const user = await UserRepository.updateUsername({ username, id: userId })
-
-  await SessionRepository.updatePublicData(ctx.session, {
-    name: Name.nullable(user.name),
-    username: new Username(user.username),
-    iconImageId: user.iconImage ? new Id(user.iconImage.id) : null,
-  })
-
-  return user
-}
-
-export default updateUsername
+    return null
+  }
+)

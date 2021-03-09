@@ -1,43 +1,38 @@
-import { Ctx } from "blitz"
-import { PageService } from "domain/services"
-import { Id, idSchema, Skip, skipSchema, Take } from "domain/valueObjects"
-import { PostRepository } from "infrastructure"
+import { resolver } from "blitz"
+import { Id, PageService, Skip, Take, zId, zSkip } from "integrations/domain"
+import { ReplyQuery } from "integrations/infrastructure"
+import { createAppContext } from "integrations/registry"
 import * as z from "zod"
 
-const inputSchema = z.object({
-  skip: skipSchema,
-  replyId: idSchema,
+const GetRepliesInfinite = z.object({
+  skip: zSkip,
+  replyId: zId,
 })
 
-const getRepliesInfinite = async (
-  input: z.infer<typeof inputSchema>,
-  ctx: Ctx
-) => {
-  const { replyId, skip } = inputSchema
-    .transform((input) => ({
-      skip: new Skip(input.skip),
-      replyId: new Id(input.replyId),
-    }))
-    .parse(input)
+export default resolver.pipe(
+  resolver.zod(GetRepliesInfinite),
+  (input, ctx) => ({
+    replyId: new Id(input.replyId),
+    skip: new Skip(input.skip),
+    take: new Take(),
+    userId: ctx.session.userId === null ? null : new Id(ctx.session.userId),
+  }),
+  async ({ replyId, skip, take, userId }) => {
+    const app = await createAppContext()
 
-  const userId = ctx.session.userId === null ? null : new Id(ctx.session.userId)
+    const posts = await app.get(ReplyQuery).findMany({
+      skip,
+      take,
+      replyId,
+      userId,
+    })
 
-  const take = new Take()
+    const count = await app.get(ReplyQuery).count({ replyId })
 
-  const posts = await PostRepository.getReplies({
-    skip,
-    take,
-    replyId,
-    userId,
-  })
+    const hasMore = app.get(PageService).hasMore(skip, take, count)
 
-  const count = await PostRepository.countReplies({ replyId })
+    const nextPage = hasMore ? app.get(PageService).nextPage(take, skip) : null
 
-  const hasMore = PageService.hasMore({ count, skip, take })
-
-  const nextPage = hasMore ? PageService.nextPage({ take, skip }) : null
-
-  return { hasMore, posts, nextPage }
-}
-
-export default getRepliesInfinite
+    return { hasMore, posts, nextPage }
+  }
+)

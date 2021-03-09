@@ -1,29 +1,26 @@
-import { Ctx } from "blitz"
-import { Id, idSchema, PostText, postTextSchema } from "domain/valueObjects"
-import { MessageRepository } from "infrastructure"
-import * as z from "zod"
+import { zCreateMessageMutation } from "app/exchanges/validations/createMessageMutation"
+import { resolver } from "blitz"
+import { SendMessageService } from "integrations/application"
+import { Id, PostText } from "integrations/domain"
+import { createAppContext } from "integrations/registry"
 
-export const inputSchema = z.object({
-  text: postTextSchema,
-  relatedUserId: idSchema,
-})
-
-const createMessage = async (input: z.infer<typeof inputSchema>, ctx: Ctx) => {
-  inputSchema.parse(input)
-
-  ctx.session.authorize()
-
-  const text = new PostText(input.text)
-
-  const userId = new Id(ctx.session.userId)
-
-  const message = await MessageRepository.createMessage({
-    text,
-    userId,
+export default resolver.pipe(
+  resolver.zod(zCreateMessageMutation),
+  resolver.authorize(),
+  (input, ctx) => ({
     relatedUserId: new Id(input.relatedUserId),
-  })
+    text: new PostText(input.text),
+    userId: new Id(ctx.session.userId),
+  }),
+  async (input) => {
+    const app = await createAppContext()
 
-  return message
-}
+    await app.get(SendMessageService).call({
+      text: input.text,
+      userId: input.userId,
+      relatedUserId: input.relatedUserId,
+    })
 
-export default createMessage
+    return null
+  }
+)

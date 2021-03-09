@@ -1,5 +1,5 @@
 import { HStack, Stack, Text } from "@chakra-ui/react"
-import { AvatarUser } from "app/components/AvatarUser"
+import { AvatarUser } from "app/core/components/AvatarUser"
 import { StackHeaderUserAction } from "app/posts/components/StackHeaderUserAction"
 import { StackPostImage } from "app/posts/components/StackPostImage"
 import getPost from "app/posts/queries/getPost"
@@ -14,7 +14,7 @@ export const ShowPostPageDetail: FunctionComponent = () => {
   return (
     <Stack spacing={4} px={4}>
       <HStack spacing={4}>
-        <AvatarUser userId={post.userId} />
+        <AvatarUser userId={post.user.id} />
         <StackHeaderUserAction {...post.user} />
       </HStack>
       <Stack>
@@ -22,7 +22,7 @@ export const ShowPostPageDetail: FunctionComponent = () => {
           {post.text}
         </Text>
       </Stack>
-      {post.files?.length && <StackPostImage files={post.files} />}
+      {post.fileIds?.length && <StackPostImage fileIds={post.fileIds} />}
       <HStack>
         <Text color={"gray.500"} fontSize={"lg"}>
           {post.createdAt.toLocaleTimeString()}

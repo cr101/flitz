@@ -1,23 +1,28 @@
-import { Ctx } from "blitz"
-import { SessionRepository } from "infrastructure"
-import { SettingService } from "services"
+import { NotFoundError, resolver } from "blitz"
+import { Id } from "integrations/domain"
+import { UserSettingQuery } from "integrations/infrastructure"
+import { createAppContext } from "integrations/registry"
+import * as z from "zod"
 
-const getSetting = async (_: any, ctx: Ctx) => {
-  ctx.session.authorize()
+const GetSetting = z.null()
 
-  const userId = SessionRepository.getUserId(ctx.session)
+export default resolver.pipe(
+  resolver.zod(GetSetting),
+  resolver.authorize(),
+  (_, ctx) => ({
+    userId: new Id(ctx.session.userId),
+  }),
+  async (input) => {
+    const app = await createAppContext()
 
-  const setting = await SettingService.createAndGetSetting({ userId })
+    const setting = await app
+      .get(UserSettingQuery)
+      .find({ userId: input.userId })
 
-  if (setting === null) {
-    throw new Error("")
+    if (setting === null) {
+      throw new NotFoundError()
+    }
+
+    return setting
   }
-
-  return {
-    ...setting,
-    fcmToken: setting.fcmToken?.slice(0, 4) || null,
-    fcmTokenForMobile: setting.fcmTokenForMobile?.slice(0, 4) || null,
-  }
-}
-
-export default getSetting
+)

@@ -6,7 +6,7 @@ import {
   HStack,
   StackDivider,
 } from "@chakra-ui/react"
-import { StackList } from "app/components/StackList"
+import { StackList } from "app/core/components/StackList"
 import { StackCardExchange } from "app/exchanges/components/StackCardExchange"
 import getExchanges from "app/exchanges/queries/getExchanges"
 import { usePaginatedQuery, useRouter } from "blitz"
@@ -62,7 +62,7 @@ export const ExchangesPageList: FunctionComponent = () => {
             {...exchange}
             key={exchange.id}
             onClick={() => {
-              onMoveExchangePage(exchange.id, exchange.relatedUserId)
+              onMoveExchangePage(exchange.id, exchange.relatedUser.id)
             }}
           />
         ))}

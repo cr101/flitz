@@ -1,5 +1,5 @@
 import { StackDivider } from "@chakra-ui/react"
-import { StackList } from "app/components/StackList"
+import { StackList } from "app/core/components/StackList"
 import { StackCardPost } from "app/posts/components/StackCardPost"
 import getPostsInfinite from "app/posts/queries/getPostsInfinite"
 import { useInfiniteQuery, useSession } from "blitz"
@@ -13,7 +13,7 @@ export const PostsPageList: FunctionComponent = () => {
     (page = { skip: 0 }) => page,
     {
       getFetchMore: (lastGroup) => lastGroup.nextPage,
-      refetchInterval: 2000,
+      refetchInterval: 1000 * 2 ** 4,
     }
   )
 
@@ -23,7 +23,7 @@ export const PostsPageList: FunctionComponent = () => {
         return group.posts.map((post) => {
           return (
             <StackCardPost
-              isDisabled={!session.userId || session.userId === post.userId}
+              isDisabled={!session.userId || session.userId === post.user.id}
               {...post}
             />
           )

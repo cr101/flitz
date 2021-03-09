@@ -1,17 +1,24 @@
-import { Ctx } from "blitz"
-import { Id } from "domain/valueObjects"
-import { NotificationRepository } from "infrastructure"
+import { resolver } from "blitz"
+import { Id } from "integrations/domain"
+import { UserNotificationQuery } from "integrations/infrastructure"
+import { createAppContext } from "integrations/registry"
+import * as z from "zod"
 
-const checkUnreadNotifications = async (_ = null, ctx: Ctx) => {
-  ctx.session.authorize()
+const CheckUnreadNotifications = z.null()
 
-  const userId = new Id(ctx.session.userId)
+export default resolver.pipe(
+  resolver.zod(CheckUnreadNotifications),
+  resolver.authorize(),
+  (_, ctx) => ({
+    userId: new Id(ctx.session.userId),
+  }),
+  async (input) => {
+    const app = await createAppContext()
 
-  const hasUnreadNotifications = await NotificationRepository.hasUnreadNotifications(
-    { userId }
-  )
+    const hasUnreadNotifications = await app
+      .get(UserNotificationQuery)
+      .hasUnread(input.userId)
 
-  return hasUnreadNotifications
-}
-
-export default checkUnreadNotifications
+    return hasUnreadNotifications
+  }
+)
